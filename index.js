@@ -1,6 +1,7 @@
 console.log('starting server...');
 const PORT = 3000;
 
+const cors = require('cors');
 const express = require("express");
 const admin = require("firebase-admin");
 const fetch = require("node-fetch");
@@ -11,6 +12,8 @@ app.use(express.json());
 app.get("/", (req,res) => {
     res.send('Server started');
 });
+
+app.use(cors({ origin: "http://localhost:5173" }));
 
 app.listen(PORT, () => {
     console.log(`Server listening on port ${PORT}`);
@@ -25,7 +28,7 @@ const db = admin.database();
 
 app.post("/prompt", async (req, res) => {
   const { prompt } = req.body;
-
+  console.log('llegó un prompt: ', prompt);
   try {
     const snapshot = await db.ref("messages").once("value");
     const messages = snapshot.val();
@@ -44,20 +47,22 @@ app.post("/prompt", async (req, res) => {
         Respondé de forma clara y concisa por favor.
         `;
 
-    //TODO: CALL OLLAMA
+    //TODO: CALL OLLAMA PASSING "PROMPT"
 
-    const response = await fetch("http://localhost:11434/api/generate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "mistral",
-        prompt,
-        // STREAM FALSE FOR NOW
-        stream: false,
-      }),
-    });
-    const data = await response.json();
-    return res.json({ answer: data.response.trim() });
+    // const response = await fetch("http://localhost:11434/api/generate", {
+    //   method: "POST",
+    //   headers: { "Content-Type": "application/json" },
+    //   body: JSON.stringify({
+    //     model: "mistral",
+    //     prompt,
+    //     // STREAM FALSE FOR NOW
+    //     stream: false,
+    //   }),
+    // });
+    // const data = await response.json();
+    // return res.json({ answer: data.response.trim() });
+
+    return res.json({code: 'Funciona!'});
   } catch (error) {
     console.error(error);
     return res.status(500).json({ error: "Internal server error" });
