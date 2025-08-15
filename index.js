@@ -46,9 +46,7 @@ app.post("/prompt", async (req, res) => {
   try {
     const snapshot = await db.ref("messages").once("value");
     const messages = snapshot.val();
-
-    console.log('Pregunta: ', req.body.prompt);
-
+    
     if (!messages) return res.status(404).json({ error: "No messages found" });
 
     const messagesList = Object.values(messages);
@@ -85,8 +83,6 @@ app.post("/prompt", async (req, res) => {
     });
 
     const data = await response.json();
-    console.log("RESPUESTA DE OLLAMA:");
-    console.log(data);
 
     return res.json({ answer: data.response.trim() });
   } catch (error) {
