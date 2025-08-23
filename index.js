@@ -42,6 +42,7 @@ admin.initializeApp({
 const db = admin.database();
 
 app.post("/prompt", async (req, res) => {
+  console.log('Asking LLM...');
   const { prompt } = req.body;
   try {
     const snapshot = await db.ref("messages").once("value");
