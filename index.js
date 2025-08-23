@@ -22,7 +22,7 @@ const serviceAccount = {
   auth_provider_x509_cert_url: process.env.FIREBASE_AUTH_PROVIDER_X509_CERT_URL,
   client_x509_cert_url: process.env.FIREBASE_CLIENT_X509_CERT_URL,
   universe_domain: process.env.FIREBASE_UNIVERSE_DOMAIN,
-}
+};
 
 app.get("/", (req, res) => {
   res.send("Server started");
@@ -46,7 +46,7 @@ app.post("/prompt", async (req, res) => {
   try {
     const snapshot = await db.ref("messages").once("value");
     const messages = snapshot.val();
-    
+
     if (!messages) return res.status(404).json({ error: "No messages found" });
 
     const messagesList = Object.values(messages);
@@ -61,16 +61,25 @@ app.post("/prompt", async (req, res) => {
 
     const targetPrompt = `Hola, eres un asistente que lee mensajes de un chat y decide si debe ejecutar una acción. Las acciones posibles son:
     1 - saveOffUser(usuario, fecha, descripción). Esta acción se va a ejecutar cuando haya algun mensaje que contenga "no voy a estar" o "voy a estar off". La descripción va a ser el motivo por el que no esté el usuario, si es que lo aclara
-    2 - ninguna (si no hay accion que ejecutar) 
+    2 - ninguna (si no hay accion que ejecutar) entonces simplemente
 
     Responde en formato JSON según el evento y con este formato. Por ejemplo si el tool es saveOffUser:
     {
-      "tool": "saveOffUser", "params": {"user": "Usuario", "date": "el dia en el que no va a estar el usuario", "reason": "No estará por vacaciones el dia 18 de agosto"}
+      "tool": "saveOffUser", 
+      "params": {"user": "Usuario", "date": "el dia en el que no va a estar el usuario", "reason": "No estará por vacaciones el dia 18 de agosto"}
+      "answer" "aqui coloca la respuesta que le des al usuario en formato humano"
+    }
+    Pero si no hay ningún evento que ejecutar, entonces responde con:
+    {
+      "tool": "none", 
+      "params": "none"
+      "answer": "aqui coloca la respuesta que le des al usuario en formato humano"
     }
         Los mensajes del chat son estos: ${messagesText}
 
         Y la pregunta es: ${prompt}.
         `;
+
 
     const response = await fetch("http://localhost:11434/api/generate", {
       method: "POST",
@@ -82,8 +91,10 @@ app.post("/prompt", async (req, res) => {
       }),
     });
 
-    const data = await response.json();
+    // CHECK LLM RESPONSE AND TRIGGER AN ACTION BASED ON LLM "TOOL" PARAM
 
+    const data = await response.json();
+    console.log("DATA DESDE EL BACK: ", { data });
     return res.json({ answer: data.response.trim() });
   } catch (error) {
     console.error(error);
