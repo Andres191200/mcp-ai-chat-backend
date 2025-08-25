@@ -60,13 +60,13 @@ async function handlePrompt(prompt) {
 
   const targetPrompt = `Hola, eres un asistente que lee mensajes de un chat y decide si debe ejecutar una acción. Las acciones posibles son:
     1 - saveOffUser(usuario, fecha, descripción). Esta acción se va a ejecutar cuando haya algun mensaje que contenga "no voy a estar" o "voy a estar off". La descripción va a ser el motivo por el que no esté el usuario, si es que lo aclara
-    2 - ninguna (si no hay accion que ejecutar) entonces simplemente
+    2 - ninguna (si no hay accion que ejecutar de las anteriormente mencionadas).
 
     Responde en formato JSON según el evento y con este formato. Por ejemplo si el tool es saveOffUser:
     {
       "tool": "saveOffUser", 
-      "params": {"user": "Usuario", "date": "el dia en el que no va a estar el usuario", "reason": "No estará por vacaciones el dia 18 de agosto"}
-      "answer" "aqui coloca la respuesta que le des al usuario en formato humano"
+      "params": {"user": "Usuario", "date": "el dia en el que no va a estar el usuario", "reason": "la razón por la que el usuario no estará, si es que la hay"}
+      "answer" "none"
     }
     Pero si no hay ningún evento que ejecutar, entonces responde con:
     {
@@ -76,7 +76,7 @@ async function handlePrompt(prompt) {
     }
         Los mensajes del chat son estos: ${messagesText}
 
-        Y la pregunta es: ${prompt}.
+        Y la pregunta o el mensaje es: ${prompt}.
         `;
 
   // Llamar a Ollama
