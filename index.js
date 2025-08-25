@@ -22,7 +22,7 @@ const serviceAccount = {
   auth_provider_x509_cert_url: process.env.FIREBASE_AUTH_PROVIDER_X509_CERT_URL,
   client_x509_cert_url: process.env.FIREBASE_CLIENT_X509_CERT_URL,
   universe_domain: process.env.FIREBASE_UNIVERSE_DOMAIN,
-}
+};
 
 app.get("/", (req, res) => {
   res.send("Server started");
@@ -41,52 +41,105 @@ admin.initializeApp({
 
 const db = admin.database();
 
-app.post("/prompt", async (req, res) => {
-  const { prompt } = req.body;
-  try {
-    const snapshot = await db.ref("messages").once("value");
-    const messages = snapshot.val();
-    
-    if (!messages) return res.status(404).json({ error: "No messages found" });
+async function handlePrompt(prompt) {
+  // Obtener mensajes
+  const snapshot = await db.ref("messages").once("value");
+  const messages = snapshot.val();
+  if (!messages) {
+    return { error: "No messages found" };
+  }
 
-    const messagesList = Object.values(messages);
+  const messagesList = Object.values(messages);
+  const messagesText = messagesList
+    .map((msg) => {
+      return `${msg.userName} (${new Date(msg.timestamp).toLocaleString()}): ${
+        msg.message
+      }`;
+    })
+    .join("\n");
 
-    const messagesText = messagesList
-      .map((msg) => {
-        return `${msg.userName} (${new Date(
-          msg.timestamp
-        ).toLocaleString()}): ${msg.message}`;
-      })
-      .join("\n");
-
-    const targetPrompt = `Hola, eres un asistente que lee mensajes de un chat y decide si debe ejecutar una acción. Las acciones posibles son:
+  const targetPrompt = `Hola, eres un asistente que lee mensajes de un chat y decide si debe ejecutar una acción. Las acciones posibles son:
     1 - saveOffUser(usuario, fecha, descripción). Esta acción se va a ejecutar cuando haya algun mensaje que contenga "no voy a estar" o "voy a estar off". La descripción va a ser el motivo por el que no esté el usuario, si es que lo aclara
-    2 - ninguna (si no hay accion que ejecutar) 
+    2 - ninguna (si no hay accion que ejecutar) entonces simplemente
 
     Responde en formato JSON según el evento y con este formato. Por ejemplo si el tool es saveOffUser:
     {
-      "tool": "saveOffUser", "params": {"user": "Usuario", "date": "el dia en el que no va a estar el usuario", "reason": "No estará por vacaciones el dia 18 de agosto"}
+      "tool": "saveOffUser", 
+      "params": {"user": "Usuario", "date": "el dia en el que no va a estar el usuario", "reason": "No estará por vacaciones el dia 18 de agosto"}
+      "answer" "aqui coloca la respuesta que le des al usuario en formato humano"
+    }
+    Pero si no hay ningún evento que ejecutar, entonces responde con:
+    {
+      "tool": "none", 
+      "params": "none"
+      "answer": "aqui coloca la respuesta que le des al usuario en formato humano"
     }
         Los mensajes del chat son estos: ${messagesText}
 
         Y la pregunta es: ${prompt}.
         `;
 
-    const response = await fetch("http://localhost:11434/api/generate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "mistral",
-        prompt: targetPrompt,
-        stream: false,
-      }),
-    });
+  // Llamar a Ollama
+  const response = await fetch("http://localhost:11434/api/generate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "mistral",
+      prompt: targetPrompt,
+      stream: false,
+    }),
+  });
 
-    const data = await response.json();
+  const data = await response.json();
+  return { answer: data.response?.trim() };
+}
 
-    return res.json({ answer: data.response.trim() });
+app.post("/prompt", async (req, res) => {
+  console.log("Asking LLM...");
+  const { prompt } = req.body;
+  try {
+    const result = await handlePrompt(prompt);
+
+    if (result.error) {
+      return res.status(404).json(result);
+    }
+    return res.json(result);
   } catch (error) {
     console.error(error);
     return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+app.post("/messages", async (req, res) => {
+  const { userName, message, userID, date } = req.body;
+  let isAIresponse = false;
+
+  if (!userName || !message || !userID || !date) {
+    return res.status(400).json({ error: "Missing required fields" });
+  }
+
+  // CALLING LLM TO CHECK EVERY USER INCOMING MESSAGE
+  try {
+    // 1 - SAVING IN DB FIRST TO PREVENT STUCK THE MESSAGE THROUGH LLM TIMING RESPONSE
+    const messagesRef = db.ref("messages");
+    const newMessageRef = messagesRef.push();
+    await newMessageRef.set({
+      message,
+      userID,
+      date,
+      username: isAIresponse ? "AI" : userName,
+      timestamp: date,
+    });
+    console.log("MESSAGE SAVED SUCCESSFULLY");
+
+    // 2 - SENDING THE MESSAGE TO THE LLM IN BACKGROUND
+    console.log('SENDING THE RESPONSE TO THE LLM');
+    const result = await handlePrompt(message);
+    console.log("Respuesta del LLM:", result.answer);
+    
+    return res.json({ success: true });
+  } catch (error) {
+    console.log("ERROR SAVING MESSAGE");
+    return res.status(500).json({ error: "Failed to save message" });
   }
 });
