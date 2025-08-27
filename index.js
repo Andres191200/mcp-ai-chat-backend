@@ -42,9 +42,10 @@ admin.initializeApp({
 const db = admin.database();
 
 async function handlePrompt(prompt) {
-  // Obtener mensajes
   const snapshot = await db.ref("messages").once("value");
   const messages = snapshot.val();
+  let targetPrompt = "";
+
   if (!messages) {
     return { error: "No messages found" };
   }
@@ -58,28 +59,39 @@ async function handlePrompt(prompt) {
     })
     .join("\n");
 
-  const targetPrompt = `Hola, eres un asistente que lee mensajes de un chat y decide si debe ejecutar una acción. Las acciones posibles son:
-    1 - saveOffUser(usuario, fecha, descripción). Esta acción se va a ejecutar cuando haya algun mensaje que contenga "no voy a estar" o "voy a estar off". La descripción va a ser el motivo por el que no esté el usuario, si es que lo aclara
-    2 - ninguna (si no hay accion que ejecutar de las anteriormente mencionadas).
+  // CONDITIONAL PROMPT BASED ON "/PROMPT" OR A NORMAL MESSAGE
+  if (prompt.toLowerCase.startsWith("/prompt")) {
+    targetPrompt = `Hola, eres un asistente que lee mensajes de un chat y responde una pregunta
+    Responde en este formato JSON:
+    {
+      "params": {"user": "el usuario que envió el mensaje", "date": "la fecha en que el usuario envió el mensaje"},
+      "answer" "la respuesta a la pregunta del usuario",
+    }
+      Los mensajes del chat en caso de que los necesites son estos: ${messagesText}.
+      Y el mensaje del usuario es: ${prompt}.`;
+  } else {
+    targetPrompt = `Hola, eres un asistente que lee mensajes de un chat y decide si debe ejecutar una acción. Las acciones posibles son:
+    1 - saveOffUser: Esta acción se va a ejecutar cuando haya algun mensaje que contenga "no voy a estar" o "voy a estar off"
+    2 - ninguna 
 
-    Responde en formato JSON según el evento y con este formato. Por ejemplo si el tool es saveOffUser:
+    Responde en formato JSON según el evento. Si el tool es saveOffUser:
     {
       "tool": "saveOffUser", 
-      "params": {"user": "Usuario", "date": "el dia en el que no va a estar el usuario", "reason": "la razón por la que el usuario no estará, si es que la hay"}
-      "answer" "none"
+      "params": {"user": "Usuario", "date": "el dia en el que no va a estar el usuario", "reason": "la razón por la que el usuario no estará, si es que la hay"},
+      "answer" "none",
     }
+
     Pero si no hay ningún evento que ejecutar, entonces responde con:
     {
       "tool": "none", 
-      "params": "none"
-      "answer": "aqui coloca la respuesta que le des al usuario en formato humano"
+      "params": "none",
+      "answer": "aqui coloca la respuesta que le des al usuario en formato humano",
     }
-        Los mensajes del chat son estos: ${messagesText}
 
-        Y la pregunta o el mensaje es: ${prompt}.
+        El mensaje es: ${prompt}.
         `;
+  }
 
-  // Llamar a Ollama
   const response = await fetch("http://localhost:11434/api/generate", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -93,22 +105,6 @@ async function handlePrompt(prompt) {
   const data = await response.json();
   return { answer: data.response?.trim() };
 }
-
-app.post("/prompt", async (req, res) => {
-  console.log("Asking LLM...");
-  const { prompt } = req.body;
-  try {
-    const result = await handlePrompt(prompt);
-
-    if (result.error) {
-      return res.status(404).json(result);
-    }
-    return res.json(result);
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({ error: "Internal server error" });
-  }
-});
 
 app.post("/messages", async (req, res) => {
   const { userName, message, userID, date } = req.body;
@@ -130,13 +126,13 @@ app.post("/messages", async (req, res) => {
       username: isAIresponse ? "AI" : userName,
       timestamp: date,
     });
-    console.log("MESSAGE SAVED SUCCESSFULLY");
 
     // 2 - SENDING THE MESSAGE TO THE LLM IN BACKGROUND
-    console.log('SENDING THE RESPONSE TO THE LLM');
+    console.log("SENDING THE RESPONSE TO THE LLM");
+    console.log("MESSAGE: ", message);
     const result = await handlePrompt(message);
     console.log("Respuesta del LLM:", result.answer);
-    
+
     return res.json({ success: true });
   } catch (error) {
     console.log("ERROR SAVING MESSAGE");
