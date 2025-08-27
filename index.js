@@ -44,6 +44,8 @@ const db = admin.database();
 async function handlePrompt(prompt) {
   const snapshot = await db.ref("messages").once("value");
   const messages = snapshot.val();
+  let targetPrompt = "";
+
   if (!messages) {
     return { error: "No messages found" };
   }
@@ -58,7 +60,17 @@ async function handlePrompt(prompt) {
     .join("\n");
 
   // CONDITIONAL PROMPT BASED ON "/PROMPT" OR A NORMAL MESSAGE
-  const targetPrompt = `Hola, eres un asistente que lee mensajes de un chat y decide si debe ejecutar una acción. Las acciones posibles son:
+  if (prompt.toLowerCase.startsWith("/prompt")) {
+    targetPrompt = `Hola, eres un asistente que lee mensajes de un chat y responde una pregunta
+    Responde en este formato JSON:
+    {
+      "params": {"user": "el usuario que envió el mensaje", "date": "la fecha en que el usuario envió el mensaje"},
+      "answer" "la respuesta a la pregunta del usuario",
+    }
+      Los mensajes del chat en caso de que los necesites son estos: ${messagesText}.
+      Y el mensaje del usuario es: ${prompt}.`;
+  } else {
+    targetPrompt = `Hola, eres un asistente que lee mensajes de un chat y decide si debe ejecutar una acción. Las acciones posibles son:
     1 - saveOffUser: Esta acción se va a ejecutar cuando haya algun mensaje que contenga "no voy a estar" o "voy a estar off"
     2 - ninguna 
 
@@ -78,8 +90,8 @@ async function handlePrompt(prompt) {
 
         El mensaje es: ${prompt}.
         `;
+  }
 
-  // Llamar a Ollama
   const response = await fetch("http://localhost:11434/api/generate", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -93,22 +105,6 @@ async function handlePrompt(prompt) {
   const data = await response.json();
   return { answer: data.response?.trim() };
 }
-
-app.post("/prompt", async (req, res) => {
-  console.log("Asking LLM...");
-  const { prompt } = req.body;
-  try {
-    const result = await handlePrompt(prompt);
-
-    if (result.error) {
-      return res.status(404).json(result);
-    }
-    return res.json(result);
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({ error: "Internal server error" });
-  }
-});
 
 app.post("/messages", async (req, res) => {
   const { userName, message, userID, date } = req.body;
