@@ -53,22 +53,22 @@ async function handlePrompt(prompt) {
   const messagesList = Object.values(messages);
   const messagesText = messagesList
     .map((msg) => {
-      return `${msg.userName} (${new Date(msg.timestamp).toLocaleString()}): ${
+      return `${msg.username} (${new Date(msg.timestamp).toLocaleString()}): ${
         msg.message
       }`;
     })
     .join("\n");
 
   // CONDITIONAL PROMPT BASED ON "/PROMPT" OR A NORMAL MESSAGE
-  if (prompt.toLowerCase.startsWith("/prompt")) {
+  if (prompt.toLowerCase().startsWith("/prompt")) {
     targetPrompt = `Hola, eres un asistente que lee mensajes de un chat y responde una pregunta
     Responde en este formato JSON:
     {
-      "params": {"user": "el usuario que envió el mensaje", "date": "la fecha en que el usuario envió el mensaje"},
-      "answer" "la respuesta a la pregunta del usuario",
+      "params": {"user": el usuario que envió el mensaje, "date": la fecha en que el usuario envió el mensaje},
+      "answer": la respuesta a la pregunta del usuario,
     }
-      Los mensajes del chat en caso de que los necesites son estos: ${messagesText}.
-      Y el mensaje del usuario es: ${prompt}.`;
+      
+      El mensaje del usuario es: ${prompt}.`;
   } else {
     targetPrompt = `Hola, eres un asistente que lee mensajes de un chat y decide si debe ejecutar una acción. Las acciones posibles son:
     1 - saveOffUser: Esta acción se va a ejecutar cuando haya algun mensaje que contenga "no voy a estar" o "voy a estar off"
@@ -107,10 +107,9 @@ async function handlePrompt(prompt) {
 }
 
 app.post("/messages", async (req, res) => {
-  const { userName, message, userID, date } = req.body;
-  let isAIresponse = false;
+  const { username, message, userID, date } = req.body;
 
-  if (!userName || !message || !userID || !date) {
+  if (!username || !message || !userID || !date) {
     return res.status(400).json({ error: "Missing required fields" });
   }
 
@@ -123,19 +122,25 @@ app.post("/messages", async (req, res) => {
       message,
       userID,
       date,
-      username: isAIresponse ? "AI" : userName,
+      username: username,
       timestamp: date,
     });
 
     // 2 - SENDING THE MESSAGE TO THE LLM IN BACKGROUND
     console.log("SENDING THE RESPONSE TO THE LLM");
-    console.log("MESSAGE: ", message);
     const result = await handlePrompt(message);
-    console.log("Respuesta del LLM:", result.answer);
-
+    const answer = JSON.parse(result.answer).answer;
+    console.log('raw response: ', JSON.parse(result.answer))
+    console.log('answer: ', JSON.parse(result.answer).answer);
+    let parsedResponse = {
+      success: true,
+    }
+    if(result.answer != 'none'){
+      parsedResponse = {...parsedResponse, result}
+    }
     return res.json({ success: true });
   } catch (error) {
-    console.log("ERROR SAVING MESSAGE");
+    console.log(error);
     return res.status(500).json({ error: "Failed to save message" });
   }
 });
