@@ -81,13 +81,6 @@ async function handlePrompt(prompt) {
       "answer" "none",
     }
 
-    Pero si no hay ningún evento que ejecutar, entonces responde con:
-    {
-      "tool": "none", 
-      "params": "none",
-      "answer": "aqui coloca la respuesta que le des al usuario en formato humano",
-    }
-
         El mensaje es: ${prompt}.
         `;
   }
@@ -127,18 +120,20 @@ app.post("/messages", async (req, res) => {
     });
 
     // 2 - SENDING THE MESSAGE TO THE LLM IN BACKGROUND
-    console.log("SENDING THE RESPONSE TO THE LLM");
+     if(username.toLowerCase() === 'ai'){
+      // THIS PREVENTS AN INFINITE LOOP, SENDING TO LLM PROCESSOR IT'S OWN RESPONSES
+      return res.status(201).send();
+    }
     const result = await handlePrompt(message);
     const answer = JSON.parse(result.answer).answer;
-    console.log('raw response: ', JSON.parse(result.answer))
-    console.log('answer: ', JSON.parse(result.answer).answer);
     let parsedResponse = {
       success: true,
+    };
+    if (answer != "none") {
+      parsedResponse = { ...parsedResponse, answer: answer };
     }
-    if(result.answer != 'none'){
-      parsedResponse = {...parsedResponse, result}
-    }
-    return res.json({ success: true });
+    console.log('backend response: ', parsedResponse);
+    return res.status(201).json(parsedResponse);
   } catch (error) {
     console.log(error);
     return res.status(500).json({ error: "Failed to save message" });
