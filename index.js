@@ -61,19 +61,29 @@ async function handlePrompt(prompt) {
 
   // CONDITIONAL PROMPT BASED ON "/PROMPT" OR A NORMAL MESSAGE
   if (prompt.toLowerCase().startsWith("/prompt")) {
-    targetPrompt = `Hola, eres un asistente que lee mensajes de un chat y responde una pregunta
-    Responde en este formato JSON:
-    {
-      "params": {"user": el usuario que envió el mensaje, "date": la fecha en que el usuario envió el mensaje},
-      "answer": la respuesta a la pregunta del usuario,
-    }
+    targetPrompt = `Hola, eres un asistente que lee mensajes de un chat y responde una pregunta y en algunos casos decides si debes ejecutar alguna acción
+
+    Si el usuario envia un mensaje que termina con un "?" entonces es una pregunta normal y debes responder solo en este formato JSON
+      {
+        "params": {"user": el usuario que envió el mensaje, "date": la fecha en que el usuario envió el mensaje},
+        "answer": la respuesta a la pregunta del usuario,
+      }
+
+    Si el mensaje contiene algo como:
+    - "Cargame "x" horas al objetivo "(nombre objetivo)" donde "x" es la cantidad de horas que el usuario pidió que le cargues, entonces responde solo en
+    este formato JSON:
+      {
+        "tool": "saveWorkedTime"
+        "params": {"user": "Usuario", "objectiveName": "el nombre del objetivo", "workedTime": "la cantidad en minutos de las horas que el usuario pidió"}
+        "answer": Responde algo como "horas cargadas con exito"
+      }
+    
       
       El mensaje del usuario es: ${prompt}.`;
   } else {
     targetPrompt = `Hola, eres un asistente que lee mensajes de un chat y decide si debe ejecutar una acción. Las acciones posibles son:
     1 - saveOffUser: Esta acción se va a ejecutar cuando haya algun mensaje que contenga "no voy a estar" o "voy a estar off"
-    2 - saveWorkedTime: esta acción se va a ejecutar cuando el mensaje contenga "Cargame $(x) horas al objetivo $(nombre del objetivo)" donde "x" es la cantidad de horas que el usuario pidió que le cargues
-    3 - ninguna 
+    2 - ninguna 
 
     Responde en formato JSON según el evento:
     
@@ -82,12 +92,6 @@ async function handlePrompt(prompt) {
         "tool": "saveOffUser", 
         "params": {"user": "Usuario", "date": "el dia en el que no va a estar el usuario", "reason": "la razón por la que el usuario no estará, si es que la hay"},
         "answer" "none",
-      }
-
-    - Si el tool es saveWorkedTime:
-      {
-        "tool": "saveWorkedTime"
-        "params": {"user": "Usuario", "objectiveName": "el nombre del objetivo", "workedTime": "la cantidad en minutos de las horas que el usuario pidió"}
       }
 
         El mensaje es: ${prompt}.
@@ -134,6 +138,7 @@ app.post("/messages", async (req, res) => {
       return res.status(201).send();
     }
     const result = await handlePrompt(message);
+    console.log('result: ', result);
     const answer = JSON.parse(result.answer).answer;
     console.log("result: ", result);
     let parsedResponse = {
