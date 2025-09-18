@@ -72,6 +72,7 @@ async function handlePrompt(prompt) {
   } else {
     targetPrompt = `Hola, eres un asistente que lee mensajes de un chat y decide si debe ejecutar una acción. Las acciones posibles son:
     1 - saveOffUser: Esta acción se va a ejecutar cuando haya algun mensaje que contenga "no voy a estar" o "voy a estar off"
+    3 - saveWorkedTime: esta acción se va a ejecutar cuando el mensaje contenga "Cargame horas al objetivo" 
     2 - ninguna 
 
     Responde en formato JSON según el evento. Si el tool es saveOffUser:
@@ -126,10 +127,13 @@ app.post("/messages", async (req, res) => {
     }
     const result = await handlePrompt(message);
     const answer = JSON.parse(result.answer).answer;
+    console.log('result: ', result);
     let parsedResponse = {
       success: true,
     };
     if (answer != "none") {
+    console.log('backend response: ', parsedResponse);
+
       parsedResponse = { ...parsedResponse, answer: answer };
     }
     console.log('backend response: ', parsedResponse);
