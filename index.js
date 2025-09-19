@@ -62,17 +62,7 @@ async function handlePrompt(prompt) {
   // CONDITIONAL PROMPT BASED ON "/PROMPT" OR A NORMAL MESSAGE
   if (prompt.toLowerCase().startsWith("/prompt")) {
     targetPrompt = `Hola, eres un asistente que lee mensajes de un chat y responde una pregunta y en algunos casos decides si debes ejecutar alguna acción.
-    Responde únicamente con un JSON válido.  
-    Enciérralo entre triple backticks como este ejemplo:
-    \`\`\`json{
-  "tool": "saveWorkedTime",
-  "params": {
-    "user": "Usuario",
-    "objectiveName": "actualizar bd",
-    "workedTime": "180"
-  },
-  "answer": "Las horas han sido cargadas correctamente al objetivo 'actualizar bd'."
-}\`\`\`
+    Responde únicamente con un JSON válido. 
 
     Si el usuario envia un mensaje que termina con un "?" entonces es una pregunta normal y debes responder solo en este formato JSON
       {
@@ -152,16 +142,11 @@ app.post("/messages", async (req, res) => {
 
     console.log("result: ", result);
 
-    if(JSON.parse(result.answer).match(/```json([\s\S]*?)```/)){
-      const parsed = JSON.parse(match[1]);
-  console.log('PARSED: ', parsed);
-    }
-
     const answer = JSON.parse(result.answer).answer;
     const tool = JSON.parse(result.answer).tool;
 
-    // console.log("TOOL TO EXEC: ", tool);
-    // console.log("result: ", result);
+    console.log("TOOL TO EXEC: ", tool);
+    console.log("result: ", result);
 
     if (tool === "saveWorkedTime") {
       //TODO: FIRE THE REQUEST TO API TO SAVE WORKED TIMES, ADD IN ENV VARS
