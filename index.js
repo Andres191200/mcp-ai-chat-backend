@@ -61,12 +61,34 @@ async function handlePrompt(prompt) {
 
   // CONDITIONAL PROMPT BASED ON "/PROMPT" OR A NORMAL MESSAGE
   if (prompt.toLowerCase().startsWith("/prompt")) {
-    targetPrompt = `Hola, eres un asistente que lee mensajes de un chat y responde una pregunta
-    Responde en este formato JSON:
-    {
-      "params": {"user": el usuario que envió el mensaje, "date": la fecha en que el usuario envió el mensaje},
-      "answer": la respuesta a la pregunta del usuario,
-    }
+    targetPrompt = `Hola, eres un asistente que lee mensajes de un chat y responde una pregunta y en algunos casos decides si debes ejecutar alguna acción.
+    Responde únicamente con un JSON válido.  
+    Enciérralo entre triple backticks como este ejemplo:
+    \`\`\`json{
+  "tool": "saveWorkedTime",
+  "params": {
+    "user": "Usuario",
+    "objectiveName": "actualizar bd",
+    "workedTime": "180"
+  },
+  "answer": "Las horas han sido cargadas correctamente al objetivo 'actualizar bd'."
+}\`\`\`
+
+    Si el usuario envia un mensaje que termina con un "?" entonces es una pregunta normal y debes responder solo en este formato JSON
+      {
+        "params": {"user": el usuario que envió el mensaje, "date": la fecha en que el usuario envió el mensaje},
+        "answer": la respuesta a la pregunta del usuario,
+      }
+
+    Si el mensaje contiene algo como:
+    - "Cargame "x" horas al objetivo "(nombre objetivo)" donde "x" es la cantidad de horas que el usuario pidió que le cargues, entonces responde solo en
+    este formato JSON:
+      {
+        "tool": "saveWorkedTime",
+        "params": {"user": "Usuario", "objectiveName": "el nombre del objetivo", "workedTime": "la cantidad en minutos de las horas que el usuario pidió"},
+        "answer": La respuesta al usuario si hubo exito al cargar las horas,
+      }
+    
       
       El mensaje del usuario es: ${prompt}.`;
   } else {
@@ -74,12 +96,14 @@ async function handlePrompt(prompt) {
     1 - saveOffUser: Esta acción se va a ejecutar cuando haya algun mensaje que contenga "no voy a estar" o "voy a estar off"
     2 - ninguna 
 
-    Responde en formato JSON según el evento. Si el tool es saveOffUser:
-    {
-      "tool": "saveOffUser", 
-      "params": {"user": "Usuario", "date": "el dia en el que no va a estar el usuario", "reason": "la razón por la que el usuario no estará, si es que la hay"},
-      "answer" "none",
-    }
+    Responde en formato JSON según el evento:
+    
+    - Si el tool es saveOffUser:
+      {
+        "tool": "saveOffUser", 
+        "params": {"user": "Usuario", "date": "el dia en el que no va a estar el usuario", "reason": "la razón por la que el usuario no estará, si es que la hay"},
+        "answer" "none",
+      }
 
         El mensaje es: ${prompt}.
         `;
@@ -120,19 +144,37 @@ app.post("/messages", async (req, res) => {
     });
 
     // 2 - SENDING THE MESSAGE TO THE LLM IN BACKGROUND
-     if(username.toLowerCase() === 'ai'){
+    if (username.toLowerCase() === "ai") {
       // THIS PREVENTS AN INFINITE LOOP, SENDING TO LLM PROCESSOR IT'S OWN RESPONSES
       return res.status(201).send();
     }
     const result = await handlePrompt(message);
+
+    console.log("result: ", result);
+
+    if(JSON.parse(result.answer).match(/```json([\s\S]*?)```/)){
+      const parsed = JSON.parse(match[1]);
+  console.log('PARSED: ', parsed);
+    }
+
     const answer = JSON.parse(result.answer).answer;
+    const tool = JSON.parse(result.answer).tool;
+
+    // console.log("TOOL TO EXEC: ", tool);
+    // console.log("result: ", result);
+
+    if (tool === "saveWorkedTime") {
+      //TODO: FIRE THE REQUEST TO API TO SAVE WORKED TIMES, ADD IN ENV VARS
+    }
     let parsedResponse = {
       success: true,
     };
     if (answer != "none") {
+      console.log("backend response: ", parsedResponse);
+
       parsedResponse = { ...parsedResponse, answer: answer };
     }
-    console.log('backend response: ', parsedResponse);
+    console.log("backend response: ", parsedResponse);
     return res.status(201).json(parsedResponse);
   } catch (error) {
     console.log(error);
