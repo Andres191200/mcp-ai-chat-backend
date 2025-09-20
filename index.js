@@ -41,7 +41,7 @@ admin.initializeApp({
 
 const db = admin.database();
 
-async function handlePrompt(prompt) {
+async function handlePrompt(prompt, username) {
   const snapshot = await db.ref("messages").once("value");
   const messages = snapshot.val();
   let targetPrompt = "";
@@ -75,7 +75,7 @@ async function handlePrompt(prompt) {
     este formato JSON:
       {
         "tool": "saveWorkedTime",
-        "params": {"user": "Usuario", "objectiveName": "el nombre del objetivo", "workedTime": "la cantidad en minutos de las horas que el usuario pidió"},
+        "params": {"user": ${username}, "objectiveName": "el nombre del objetivo", "workedTime": "la cantidad en minutos de las horas que el usuario pidió"},
         "answer": La respuesta al usuario si hubo exito al cargar las horas,
       }
     
@@ -138,7 +138,7 @@ app.post("/messages", async (req, res) => {
       // THIS PREVENTS AN INFINITE LOOP, SENDING TO LLM PROCESSOR IT'S OWN RESPONSES
       return res.status(201).send();
     }
-    const result = await handlePrompt(message);
+    const result = await handlePrompt(message, username);
 
     console.log("result: ", result);
 
