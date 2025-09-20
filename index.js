@@ -41,6 +41,36 @@ admin.initializeApp({
 
 const db = admin.database();
 
+// ---------- TODO ----------
+
+// RECEIVE JWT TOKEN TO SEND THE REQUEST TO THE API
+
+// --------------------------
+
+async function handleSaveWorkedTimeTool(payload){
+  console.log('payload workedTime: ', payload.workedTime);
+  const workedTimeInMinutes = payload.workedTime * 60;
+
+  // FIRE THE REQUEST WITH "workedTimeInMinutes", "userId" (coming inside jwt?? check), "objectiveId" (request to the api and match the title delegating the task to the LLM)
+
+  console.log('workedTime in minutes: ', workedTimeInMinutes);
+  console.log('handleSaveWorkedTime!');
+}
+
+async function handleTool(tool, payload) {
+  switch (tool) {
+    case "saveOffUser":
+      console.log('fire save off user tool');
+      break;
+      case "saveWorkedTime":
+      await handleSaveWorkedTimeTool(payload);
+      break;
+    default:
+      console.log("none");
+      break;
+  }
+}
+
 async function handlePrompt(prompt, username) {
   const snapshot = await db.ref("messages").once("value");
   const messages = snapshot.val();
@@ -62,7 +92,7 @@ async function handlePrompt(prompt, username) {
   // CONDITIONAL PROMPT BASED ON "/PROMPT" OR A NORMAL MESSAGE
   if (prompt.toLowerCase().startsWith("/prompt")) {
     targetPrompt = `Hola, eres un asistente que lee mensajes de un chat y responde una pregunta y en algunos casos decides si debes ejecutar alguna acción.
-    Responde únicamente con un JSON válido. 
+    Responde únicamente con un JSON válido sin incluir "//". 
 
     Si el usuario envia un mensaje que termina con un "?" entonces es una pregunta normal y debes responder solo en este formato JSON
       {
@@ -75,7 +105,7 @@ async function handlePrompt(prompt, username) {
     este formato JSON:
       {
         "tool": "saveWorkedTime",
-        "params": {"user": ${username}, "objectiveName": "el nombre del objetivo", "workedTime": "la cantidad en minutos de las horas que el usuario pidió"},
+        "params": {"user": ${username}, "objectiveName": "el nombre del objetivo", "workedTime": "la cantidad de horas que el usuario pidió"},
         "answer": La respuesta al usuario si hubo exito al cargar las horas,
       }
     
@@ -144,18 +174,20 @@ app.post("/messages", async (req, res) => {
 
     const answer = JSON.parse(result.answer).answer;
     const tool = JSON.parse(result.answer).tool;
+    const params = JSON.parse(result.answer).params;
 
-    console.log("TOOL TO EXEC: ", tool);
-    console.log("result: ", result);
+    // console.log("result: ", result);
 
-    if (tool === "saveWorkedTime") {
+    if (tool != null) {
       //TODO: FIRE THE REQUEST TO API TO SAVE WORKED TIMES, ADD IN ENV VARS
+      await handleTool(tool, params);
     }
+
     let parsedResponse = {
       success: true,
     };
     if (answer != "none") {
-      console.log("backend response: ", parsedResponse);
+      // console.log("backend response: ", parsedResponse);
 
       parsedResponse = { ...parsedResponse, answer: answer };
     }
