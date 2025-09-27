@@ -48,9 +48,8 @@ const db = admin.database();
 // --------------------------
 
 async function handleSaveWorkedTimeTool(payload) {
-  console.log("payload workedTime: ", payload.workedTime);
   const workedTimeInMinutes = payload.workedTime * 60;
-  
+
   // 1 - OBTAIN TOKEN FROM EXTERNAL API
 
   const response = await fetch(`${process.env.EXTERNAL_API_URL_1}/api/login`, {
@@ -77,13 +76,41 @@ async function handleSaveWorkedTimeTool(payload) {
         Authorization: `Bearer ${token}`,
       },
     }
-  );
-
-  console.log("objectives: ", await objectivesByPersonId.json());
+  ).then((res) => res.json());
 
   // 3 - ASK LLM TO SEARCH INTO THE OBJECTIVES THE MATCHING ONE IF ANY, COMING FROM THE INITIAL PROMPT
 
-  // --- TODO ---
+  const objectivesNames = objectivesByPersonId.map(
+    (objective) => objective.title
+  );
+
+  findObjectivePrompt = `Hola, te voy a pasar un listado de tareas y además el nombre de una tarea y necesito que primero accedas al campo "title" de cada elemento y me digas si hay alguna tarea que creas que coincida con el texto proporcionado. El listado de tareas es el siguiente: ${objectivesByPersonId}. \n Y el texto es: ${payload.objectiveName}. Responde en formato JSON de la siguiente manera.
+  En caso de que hayas encontrado una coincidencia entre el texto y algún elemento del listado respondé con este JSON:
+  {
+    "success": true,
+    "objective": el objetivo encontrado con todos sus campos
+  }
+
+  En caso de que no hayas encontrado una coincidencia respondé con este JSON:
+  {
+    success: false
+    "objective": "none"
+  }
+  `;
+
+  const foundObjective = await fetch("http://localhost:11434/api/generate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "mistral",
+      prompt: findObjectivePrompt,
+      stream: false,
+    }),
+  });
+
+  const foundObjectiveParsed =  await foundObjective.json();
+
+  console.log('response objectives LLM: ', foundObjectiveParsed);
 
   // 4 - IF EVERYTHING IS OKAY, FIRE THE REQUEST TO SAVE WORKED TIME
 
@@ -230,7 +257,6 @@ app.post("/messages", async (req, res) => {
 
     // 2 - SENDING THE MESSAGE TO THE LLM IN BACKGROUND
     if (username.toLowerCase() === "ai") {
-      // THIS PREVENTS AN INFINITE LOOP, SENDING TO LLM PROCESSOR IT'S OWN RESPONSES
       return res.status(201).send();
     }
     const result = await handlePrompt(message, username);
@@ -241,10 +267,8 @@ app.post("/messages", async (req, res) => {
     const tool = JSON.parse(result.answer).tool;
     const params = JSON.parse(result.answer).params;
 
-    // console.log("result: ", result);
 
     if (tool != null) {
-      //TODO: FIRE THE REQUEST TO API TO SAVE WORKED TIMES, ADD IN ENV VARS
       await handleTool(tool, params);
     }
 
@@ -252,11 +276,9 @@ app.post("/messages", async (req, res) => {
       success: true,
     };
     if (answer != "none") {
-      // console.log("backend response: ", parsedResponse);
-
       parsedResponse = { ...parsedResponse, answer: answer };
     }
-    console.log("backend response: ", parsedResponse);
+    // console.log("backend response: ", parsedResponse);
     return res.status(201).json(parsedResponse);
   } catch (error) {
     console.log(error);
