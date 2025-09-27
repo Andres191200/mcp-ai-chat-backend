@@ -47,22 +47,87 @@ const db = admin.database();
 
 // --------------------------
 
-async function handleSaveWorkedTimeTool(payload){
-  console.log('payload workedTime: ', payload.workedTime);
+async function handleSaveWorkedTimeTool(payload) {
+  console.log("payload workedTime: ", payload.workedTime);
   const workedTimeInMinutes = payload.workedTime * 60;
+  
+  // 1 - OBTAIN TOKEN FROM EXTERNAL API
 
-  // FIRE THE REQUEST WITH "workedTimeInMinutes", "userId" (coming inside jwt?? check), "objectiveId" (request to the api and match the title delegating the task to the LLM)
+  const response = await fetch(`${process.env.EXTERNAL_API_URL_1}/api/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      username: "grava",
+      password: "grava",
+    }),
+  });
 
-  console.log('workedTime in minutes: ', workedTimeInMinutes);
-  console.log('handleSaveWorkedTime!');
+  const { token } = await response.json();
+
+  // 2 - GET OBJECTIVES BY PERSON ID 18 (ME)
+
+  // https://api.horas.dev.grava.io/api/objectives?personId=18
+
+  const objectivesByPersonId = await fetch(
+    `${process.env.EXTERNAL_API_URL_1}/api/objectives?personId=18`,
+    {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
+
+  console.log("objectives: ", await objectivesByPersonId.json());
+
+  // 3 - ASK LLM TO SEARCH INTO THE OBJECTIVES THE MATCHING ONE IF ANY, COMING FROM THE INITIAL PROMPT
+
+  // --- TODO ---
+
+  // 4 - IF EVERYTHING IS OKAY, FIRE THE REQUEST TO SAVE WORKED TIME
+
+  const date = new Date();
+  const todayUTC = new Date(
+    Date.UTC(
+      date.getUTCFullYear(),
+      date.getUTCMonth(),
+      date.getUTCDate(),
+      0,
+      0,
+      0,
+      0
+    )
+  );
+
+  // const saveWorkedTime = await fetch(
+  //   `${process.env.EXTERNAL_API_URL_1}/api/workedTimes`,
+  //   {
+  //     method: "POST",
+  //     headers: {
+  //       "Content-Type": "application/json",
+  //       Authorization: `Bearer ${token}`,
+  //     },
+  //     body: JSON.stringify({
+  //       date: todayUTC,
+  //       entries: [
+  //         {
+  //           projectId: 77,
+  //           minutes: workedTimeInMinutes,
+  //           objectiveId: "3",
+  //         },
+  //       ],
+  //     }),
+  //   }
+  // );
 }
 
 async function handleTool(tool, payload) {
   switch (tool) {
     case "saveOffUser":
-      console.log('fire save off user tool');
+      console.log("fire save off user tool");
       break;
-      case "saveWorkedTime":
+    case "saveWorkedTime":
       await handleSaveWorkedTimeTool(payload);
       break;
     default:
