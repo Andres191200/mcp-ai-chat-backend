@@ -84,19 +84,37 @@ async function handleSaveWorkedTimeTool(payload) {
     (objective) => objective.title
   );
 
-  findObjectivePrompt = `Hola, te voy a pasar un listado de tareas y además el nombre de una tarea y necesito que primero accedas al campo "title" de cada elemento y me digas si hay alguna tarea que creas que coincida con el texto proporcionado. El listado de tareas es el siguiente: ${objectivesByPersonId}. \n Y el texto es: ${payload.objectiveName}. Responde en formato JSON de la siguiente manera.
-  En caso de que hayas encontrado una coincidencia entre el texto y algún elemento del listado respondé con este JSON:
-  {
-    "success": true,
-    "objective": el objetivo encontrado con todos sus campos
-  }
+  findObjectivePrompt = ` Eres un asistente que busca coincidencias entre textos, ya sea una coincidencia exacta o una parecida, o que el texto esté contenido dentro del nombre de la tarea dentro del listado de tareas.
 
-  En caso de que no hayas encontrado una coincidencia respondé con este JSON:
-  {
-    success: false
-    "objective": "none"
-  }
-  `;
+Te voy a dar:
+1. Un listado de tareas en formato JSON.
+2. Un texto que representa el nombre de una tarea.
+
+Debes buscar si en algún elemento del listado existe una coincidencia con el texto dado.
+
+Listado de tareas:
+### LISTADO
+${objectivesByPersonId}
+###
+
+Texto de búsqueda:
+### TEXTO
+${payload.objectiveName}
+###
+
+Responde ÚNICAMENTE en formato JSON válido, sin explicaciones ni código adicional.
+
+Si encontraste coincidencia:
+{
+  "success": "true",
+  "objective": {el objetivo encontrado con todos sus campos}
+}
+
+Si no encontraste coincidencia:
+{
+  "success": "false",
+  "objective": "none"
+}`;
 
   const foundObjective = await fetch("http://localhost:11434/api/generate", {
     method: "POST",
@@ -108,9 +126,10 @@ async function handleSaveWorkedTimeTool(payload) {
     }),
   });
 
-  const foundObjectiveParsed =  await foundObjective.json();
+  const foundObjectiveParsed = await foundObjective.json();
 
-  console.log('response objectives LLM: ', foundObjectiveParsed);
+  console.log("response objectives LLM: ", foundObjectiveParsed);
+  console.log(JSON.parse(foundObjectiveParsed.response))
 
   // 4 - IF EVERYTHING IS OKAY, FIRE THE REQUEST TO SAVE WORKED TIME
 
@@ -266,7 +285,6 @@ app.post("/messages", async (req, res) => {
     const answer = JSON.parse(result.answer).answer;
     const tool = JSON.parse(result.answer).tool;
     const params = JSON.parse(result.answer).params;
-
 
     if (tool != null) {
       await handleTool(tool, params);
