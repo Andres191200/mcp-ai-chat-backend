@@ -80,9 +80,17 @@ async function handleSaveWorkedTimeTool(payload) {
 
   // 3 - ASK LLM TO SEARCH INTO THE OBJECTIVES THE MATCHING ONE IF ANY, COMING FROM THE INITIAL PROMPT
 
-  const objectivesNames = objectivesByPersonId.map(
-    (objective) => objective.title
+  // THIS ISN'T WORKING. USE JS TO FILTER ANY COINCIDENCES???
+
+  const foundObjectiveWithJs = objectivesByPersonId.map(
+    (objective) => {
+      if(objective.title.trim().toLowerCase().includes(payload.objectiveName.trim().toLowerCase())){
+        return objective;
+      }
+    }
   );
+
+  console.log('found objective by JS: ', foundObjectiveWithJs);
 
   findObjectivePrompt = ` Eres un asistente que busca coincidencias entre textos, ya sea una coincidencia exacta o una parecida, o que el texto esté contenido dentro del nombre de la tarea dentro del listado de tareas.
 
@@ -90,7 +98,7 @@ Te voy a dar:
 1. Un listado de tareas en formato JSON.
 2. Un texto que representa el nombre de una tarea.
 
-Debes buscar si en algún elemento del listado existe una coincidencia con el texto dado.
+Debes buscar si en el campo "title" de cada elemento del listado existe una coincidencia con el texto dado.
 
 Listado de tareas:
 ### LISTADO
@@ -107,7 +115,7 @@ Responde ÚNICAMENTE en formato JSON válido, sin explicaciones ni código adici
 Si encontraste coincidencia:
 {
   "success": "true",
-  "objective": {el objetivo encontrado con todos sus campos}
+  "objective": {el objetivo encontrado sin alterar ninguno de sus campos}
 }
 
 Si no encontraste coincidencia:
@@ -116,20 +124,21 @@ Si no encontraste coincidencia:
   "objective": "none"
 }`;
 
-  const foundObjective = await fetch("http://localhost:11434/api/generate", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: "mistral",
-      prompt: findObjectivePrompt,
-      stream: false,
-    }),
-  });
+  // const foundObjective = await fetch("http://localhost:11434/api/generate", {
+  //   method: "POST",
+  //   headers: { "Content-Type": "application/json" },
+  //   body: JSON.stringify({
+  //     model: "mistral",
+  //     prompt: findObjectivePrompt,
+  //     stream: false,
+  //   }),
+  // });
 
-  const foundObjectiveParsed = await foundObjective.json();
+  // const foundObjectiveParsed = await foundObjective.json();
 
-  console.log("response objectives LLM: ", foundObjectiveParsed);
-  console.log(JSON.parse(foundObjectiveParsed.response))
+  // console.log("objectives list: ", objectivesByPersonId);
+  // console.log('');
+  // console.log(JSON.parse(foundObjectiveParsed.response))
 
   // 4 - IF EVERYTHING IS OKAY, FIRE THE REQUEST TO SAVE WORKED TIME
 
