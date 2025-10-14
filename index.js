@@ -49,6 +49,8 @@ const db = admin.database();
 
 async function handleSaveWorkedTimeTool(payload) {
   const workedTimeInMinutes = payload.workedTime * 60;
+  console.log("payload: ", payload);
+  console.log("workedtime: ", workedTimeInMinutes);
 
   // 1 - OBTAIN TOKEN FROM EXTERNAL API
 
@@ -78,27 +80,34 @@ async function handleSaveWorkedTimeTool(payload) {
     }
   ).then((res) => res.json());
 
+  console.log(JSON.stringify(objectivesByPersonId));
+
   // 3 - ASK LLM TO SEARCH INTO THE OBJECTIVES THE MATCHING ONE IF ANY, COMING FROM THE INITIAL PROMPT
 
-  const objectivesNames = objectivesByPersonId.map(
-    (objective) => objective.title
+  // THIS ISN'T WORKING. USE JS TO FILTER ANY COINCIDENCES???
+
+  const foundObjectiveWithJs = objectivesByPersonId.find((objective) =>
+    objective.title
+      .trim()
+      .toLowerCase()
+      .includes(payload.objectiveName.trim().toLowerCase())
   );
+
+  // IF NOT FOUND, MAKE THE LLM TO ANSWER A NOTFOUND MSG
+
+  console.log("found objective by JS: ", foundObjectiveWithJs);
 
   findObjectivePrompt = ` Eres un asistente que busca coincidencias entre textos, ya sea una coincidencia exacta o una parecida, o que el texto esté contenido dentro del nombre de la tarea dentro del listado de tareas.
 
-Te voy a dar:
-1. Un listado de tareas en formato JSON.
-2. Un texto que representa el nombre de una tarea.
-
-Debes buscar si en algún elemento del listado existe una coincidencia con el texto dado.
+Te voy a dar un listado de tareas en formato JSON donde cada tarea tiene un campo "title", y te voy a dar un texto que quiero que busques dentro de ese JSON
 
 Listado de tareas:
-### LISTADO
-${objectivesByPersonId}
+###
+${JSON.stringify(objectivesByPersonId)}
 ###
 
 Texto de búsqueda:
-### TEXTO
+###
 ${payload.objectiveName}
 ###
 
@@ -107,14 +116,16 @@ Responde ÚNICAMENTE en formato JSON válido, sin explicaciones ni código adici
 Si encontraste coincidencia:
 {
   "success": "true",
-  "objective": {el objetivo encontrado con todos sus campos}
+  "objective": {el objetivo encontrado sin alterar ninguno de sus campos}
 }
 
 Si no encontraste coincidencia:
 {
   "success": "false",
   "objective": "none"
-}`;
+}
+  en este ultimo caso en donde no encuentres coincidencia, quiero que seas mas detallado, en que lista de elementos buscaste y que cosa buscaste
+  `;
 
   const foundObjective = await fetch("http://localhost:11434/api/generate", {
     method: "POST",
@@ -128,8 +139,9 @@ Si no encontraste coincidencia:
 
   const foundObjectiveParsed = await foundObjective.json();
 
-  console.log("response objectives LLM: ", foundObjectiveParsed);
-  console.log(JSON.parse(foundObjectiveParsed.response))
+  // console.log("objectives list: ", objectivesByPersonId);
+  // console.log('');
+  console.log(JSON.parse(foundObjectiveParsed.response));
 
   // 4 - IF EVERYTHING IS OKAY, FIRE THE REQUEST TO SAVE WORKED TIME
 
@@ -295,6 +307,7 @@ app.post("/messages", async (req, res) => {
     };
     if (answer != "none") {
       parsedResponse = { ...parsedResponse, answer: answer };
+      console.log("parsedResponse: ", parsedResponse);
     }
     // console.log("backend response: ", parsedResponse);
     return res.status(201).json(parsedResponse);
