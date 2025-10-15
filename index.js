@@ -84,8 +84,6 @@ async function handleSaveWorkedTimeTool(payload) {
 
   // 3 - ASK LLM TO SEARCH INTO THE OBJECTIVES THE MATCHING ONE IF ANY, COMING FROM THE INITIAL PROMPT
 
-  // THIS ISN'T WORKING. USE JS TO FILTER ANY COINCIDENCES???
-
   const foundObjectiveWithJs = objectivesByPersonId.find((objective) =>
     objective.title
       .trim()
@@ -139,10 +137,22 @@ Si no encontraste coincidencia:
 
   const foundObjectiveParsed = await foundObjective.json();
 
-  // console.log("objectives list: ", objectivesByPersonId);
-  // console.log('');
   console.log(JSON.parse(foundObjectiveParsed.response));
 
+  // --------------------------------------------------------------------------------------------------------------------------------------------------
+  // TEST SEND A MESSAGE TO DB IN AN IMPERATIVE WAY TO ADITIONALLY INFORM THE USER THAT THE WORKED TIME WAS SAVED IN A FOUND OBJECTIVE WITH JS LOGIC ---
+    const messagesRef = db.ref("messages");
+    const newMessageRef = messagesRef.push();
+    await newMessageRef.set({
+      message: `Listo! se cargaron ${payload.workedTime} horas al objetivo ${foundObjectiveWithJs}`,
+      userID,
+      date,
+      username: username,
+      timestamp: date,
+    });
+
+  // --------------------------------------------------------------------------------------------------------------------------------------------------
+  
   // 4 - IF EVERYTHING IS OKAY, FIRE THE REQUEST TO SAVE WORKED TIME
 
   const date = new Date();
@@ -157,6 +167,8 @@ Si no encontraste coincidencia:
       0
     )
   );
+
+  // 5 - FINALLY SAVE WORKED TIME
 
   // const saveWorkedTime = await fetch(
   //   `${process.env.EXTERNAL_API_URL_1}/api/workedTimes`,
@@ -181,6 +193,7 @@ Si no encontraste coincidencia:
 }
 
 async function handleTool(tool, payload) {
+  console.log('entro al handletool');
   switch (tool) {
     case "saveOffUser":
       console.log("fire save off user tool");
